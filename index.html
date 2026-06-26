@@ -151,21 +151,21 @@
 
   /* SET COLUMN HEADERS */
   .set-cols-header {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 12px 4px;
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 8px 4px;
     border-bottom: 1px solid rgba(255,255,255,0.04);
   }
   .set-col-label {
     font-size: 10px; font-weight: 700; color: var(--text-muted);
     text-transform: uppercase; letter-spacing: 0.8px; text-align: center;
   }
-  .set-col-label.reps-col { flex: 0 0 112px; }
-  .set-col-label.weight-col { flex: 1; }
+  .set-col-label.reps-col { flex: 0 0 112px; text-align: center; }
+  .set-col-label.weight-col { flex: 1; text-align: center; }
 
   /* SET ROWS */
   .set-row {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 12px;
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.04);
     transition: background 0.2s;
   }
@@ -173,7 +173,7 @@
   .set-row.done { background: rgba(200,241,53,0.04); }
   .set-label {
     font-size: 11px; color: var(--text-muted); font-weight: 700;
-    width: 28px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px;
+    width: 22px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px;
   }
 
   /* NUMBER INPUT WIDGET */
