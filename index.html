@@ -575,12 +575,35 @@
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────────────
 
-const DB_KEY = 'ppl_tracker_v2';
+const DB_KEY = 'tvrd_db';         // stable forever — never change this key
+const CURRENT_VERSION = 1;        // bump when schema changes, add migration below
+
+function migrateDB(db) {
+  // Each block runs only once per user, in order.
+  // Add new blocks here when the schema changes — never edit existing ones.
+
+  // if (db.version < 2) {
+  //   db.plan.days.forEach(day =>
+  //     day.exercises.forEach(ex => ex.someNewField ??= defaultValue)
+  //   );
+  //   db.version = 2;
+  // }
+
+  return db;
+}
 
 function loadDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const db = JSON.parse(raw);
+      if (db.version < CURRENT_VERSION) {
+        const migrated = migrateDB(db);
+        localStorage.setItem(DB_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+      return db;
+    }
   } catch(e) {}
   return getDefaultDB();
 }
@@ -591,6 +614,7 @@ function saveDB() {
 
 function getDefaultDB() {
   return {
+    version: CURRENT_VERSION,
     plan: {
       id: Date.now(),
       days: [
