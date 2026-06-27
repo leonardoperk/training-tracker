@@ -377,6 +377,34 @@
   .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
   .empty-state-text { font-size: 15px; }
 
+  /* DRAFT BANNER */
+  .draft-banner {
+    margin: 12px 16px 0;
+    background: var(--surface2); border: 1px solid var(--accent);
+    border-radius: var(--radius); padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .draft-banner-text { flex: 1; font-size: 13px; font-weight: 600; }
+  .draft-banner-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .draft-btn-resume {
+    background: var(--accent); color: #000; border: none;
+    border-radius: var(--radius-sm); padding: 8px 14px;
+    font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  }
+  .draft-btn-discard {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0;
+  }
+
+  /* PREVIEW SCREEN */
+  .preview-ex-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+  }
+  .preview-ex-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .preview-ex-meta { font-size: 12px; color: var(--text-muted); }
+  .preview-ex-last { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+
   /* PROGRESS BARS */
   .exercise-progress {
     height: 3px; background: var(--border); border-radius: 2px; margin: 0 16px 2px;
@@ -405,14 +433,27 @@
 <div class="screen active" id="screen-home">
   <div class="header">
     <div style="flex:1">
-      <div class="header-title">PPL Tracker</div>
+      <div class="header-title">TVRD</div>
       <div class="header-sub" id="home-date"></div>
     </div>
     <button class="btn-icon" onclick="showScreen('screen-history')" title="History">📊</button>
     <button class="btn-icon" onclick="showScreen('screen-plan')" title="Plan">⚙️</button>
   </div>
+  <div id="draft-banner" style="display:none"></div>
   <div class="scroll-area">
     <div class="day-grid" id="day-grid"></div>
+  </div>
+</div>
+
+<!-- DAY PREVIEW SCREEN -->
+<div class="screen" id="screen-day-preview">
+  <div class="header">
+    <button class="btn-icon" onclick="showScreen('screen-home')">←</button>
+    <div class="header-title" id="preview-title"></div>
+  </div>
+  <div class="scroll-area" id="preview-body"></div>
+  <div class="bottom-bar">
+    <button class="btn-primary" style="width:100%" onclick="startWorkout()">Training starten ▶</button>
   </div>
 </div>
 
@@ -627,6 +668,28 @@ function renderHome() {
   const dateEl = document.getElementById('home-date');
   dateEl.textContent = new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
 
+  // Draft banner
+  const bannerEl = document.getElementById('draft-banner');
+  const draft = db.draftWorkout;
+  if (draft) {
+    const elapsed = draft.timerSeconds + Math.floor((Date.now() - draft.savedAt) / 1000);
+    const m = Math.floor(elapsed / 60);
+    bannerEl.style.display = '';
+    bannerEl.innerHTML = `
+      <div class="draft-banner">
+        <div style="flex:1">
+          <div class="draft-banner-text">⚡ ${draft.workoutState.dayName}</div>
+          <div class="draft-banner-sub">Unterbrochen vor ${m < 1 ? 'weniger als 1 min' : m + ' min'}</div>
+        </div>
+        <button class="draft-btn-resume" onclick="resumeWorkout()">Fortsetzen</button>
+        <button class="draft-btn-discard" onclick="discardDraft()" title="Verwerfen">✕</button>
+      </div>
+    `;
+  } else {
+    bannerEl.style.display = 'none';
+    bannerEl.innerHTML = '';
+  }
+
   const grid = document.getElementById('day-grid');
   const days = db.plan.days;
 
@@ -677,7 +740,7 @@ function renderHome() {
     }
 
     return `
-      <div class="day-card" onclick="startWorkout('${day.id}')">
+      <div class="day-card" onclick="previewDay('${day.id}')">
         <div class="card-top">
           <div class="day-dot">${day.emoji || '💪'}</div>
           <div class="day-name">${day.name}</div>
@@ -709,8 +772,36 @@ function formatDate(ts) {
 let workoutState = null;
 let timerInterval = null;
 let timerSeconds = 0;
+let pendingDayId = null;
 
-function startWorkout(dayId) {
+function previewDay(dayId) {
+  const day = db.plan.days.find(d => d.id === dayId);
+  if (!day) return;
+  pendingDayId = dayId;
+
+  document.getElementById('preview-title').textContent = day.name;
+
+  const lastSession = getLastSession(dayId);
+  const body = document.getElementById('preview-body');
+  body.innerHTML = day.exercises.map(ex => {
+    const lastEx = lastSession && lastSession.exercises.find(e => e.exId === ex.id);
+    const lastLine = lastEx
+      ? `🕐 ${lastEx.sets.map(s => `${s.reps}×${s.weight}kg`).join(' · ')}`
+      : '🕐 Erstes Mal';
+    return `
+      <div class="preview-ex-item">
+        <div class="preview-ex-name">${ex.name}</div>
+        <div class="preview-ex-meta">${ex.sets} Sets · ${ex.targetReps} Reps</div>
+        <div class="preview-ex-last">${lastLine}</div>
+      </div>
+    `;
+  }).join('');
+
+  showScreen('screen-day-preview');
+}
+
+function startWorkout() {
+  const dayId = pendingDayId;
   const day = db.plan.days.find(d => d.id === dayId);
   if (!day) return;
 
@@ -751,11 +842,36 @@ function startWorkout(dayId) {
   startTimer();
 }
 
+function saveWorkoutDraft() {
+  db.draftWorkout = {
+    workoutState: JSON.parse(JSON.stringify(workoutState)),
+    timerSeconds: timerSeconds,
+    savedAt: Date.now()
+  };
+  saveDB();
+}
+
+function resumeWorkout() {
+  const draft = db.draftWorkout;
+  if (!draft) return;
+  workoutState = draft.workoutState;
+  const totalElapsed = draft.timerSeconds + Math.floor((Date.now() - draft.savedAt) / 1000);
+  workoutState.startTime = Date.now() - totalElapsed * 1000;
+  renderWorkout();
+  showScreen('screen-workout');
+  startTimer();
+}
+
+function discardDraft() {
+  db.draftWorkout = null;
+  saveDB();
+  renderHome();
+}
+
 function startTimer() {
   clearInterval(timerInterval);
-  timerSeconds = 0;
   timerInterval = setInterval(() => {
-    timerSeconds++;
+    timerSeconds = Math.floor((Date.now() - workoutState.startTime) / 1000);
     const m = Math.floor(timerSeconds / 60);
     const s = timerSeconds % 60;
     document.getElementById('workout-timer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
@@ -879,6 +995,7 @@ function toggleSetDone(ei, si) {
   if (progFill) progFill.style.width = `${(doneSets / ex.sets.length) * 100}%`;
 
   updateWorkoutProgress();
+  saveWorkoutDraft();
 
   // Auto-scroll to next undone set
   if (set.done) {
@@ -906,6 +1023,8 @@ function confirmExitWorkout() {
 function exitWorkout() {
   clearInterval(timerInterval);
   workoutState = null;
+  db.draftWorkout = null;
+  saveDB();
   closeModal('modal-confirm');
   showScreen('screen-home');
 }
@@ -913,6 +1032,7 @@ function exitWorkout() {
 function finishWorkout() {
   if (!workoutState) return;
   clearInterval(timerInterval);
+  db.draftWorkout = null;
 
   // Save to history
   const session = {
