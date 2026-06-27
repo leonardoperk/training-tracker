@@ -939,7 +939,6 @@ function renderWorkout() {
               oninput="setVal(${ei},${si},'weight',this.value)">
             <button class="num-btn" onclick="adjustVal(${ei},${si},'weight',${ex.weightStep || 2.5})">+</button>
           </div>
-          <button class="set-check ${set.done ? 'checked' : ''}" onclick="toggleSetDone(${ei},${si})">✓</button>
         </div>
       `;
     }).join('');
@@ -956,7 +955,6 @@ function renderWorkout() {
           <div class="set-label"></div>
           <div class="set-col-label reps-col">reps</div>
           <div class="set-col-label weight-col">kg</div>
-          <div style="width:44px;flex-shrink:0"></div>
         </div>
         ${setsHTML}
       </div>
@@ -971,6 +969,11 @@ function updateWorkoutProgress() {
   document.getElementById('workout-progress-text').textContent = `${done} / ${total} Sets`;
 }
 
+function isSetCommitted(set) {
+  return (set.reps !== '' && parseFloat(set.reps) > 0) ||
+         (set.weight !== '' && parseFloat(set.weight) > 0);
+}
+
 function adjustVal(ei, si, field, delta) {
   const set = workoutState.exercises[ei].sets[si];
   const current = parseFloat(set[field]) || 0;
@@ -979,40 +982,21 @@ function adjustVal(ei, si, field, delta) {
   const row = document.getElementById(`set-${ei}-${si}`);
   const selector = field === 'reps' ? '.reps-widget .num-input' : '.weight-widget .num-input';
   row.querySelector(selector).value = newVal;
+  onValChanged(ei, si);
 }
 
 function setVal(ei, si, field, val) {
   workoutState.exercises[ei].sets[si][field] = val === '' ? '' : parseFloat(val) || 0;
+  onValChanged(ei, si);
 }
 
-function toggleSetDone(ei, si) {
+function onValChanged(ei, si) {
   const set = workoutState.exercises[ei].sets[si];
-  // If reps or weight is empty, fill from placeholder/last
-  if (set.reps === '' || set.reps === 0) {
-    const ex = workoutState.exercises[ei];
-    const prev = ex.lastSets[si];
-    const targetMin = parseInt(ex.targetReps.split('-')[0]) || 0;
-    set.reps = prev ? prev.reps : targetMin;
-    const row = document.getElementById(`set-${ei}-${si}`);
-    row.querySelectorAll('.num-input')[0].value = set.reps;
-  }
-  if (set.weight === '' || set.weight === 0) {
-    const ex = workoutState.exercises[ei];
-    const prev = ex.lastSets[si];
-    if (prev) {
-      set.weight = prev.weight;
-      const row = document.getElementById(`set-${ei}-${si}`);
-      row.querySelectorAll('.num-input')[1].value = set.weight;
-    }
-  }
-  set.done = !set.done;
+  set.done = isSetCommitted(set);
 
   const row = document.getElementById(`set-${ei}-${si}`);
   row.classList.toggle('done', set.done);
-  const btn = row.querySelector('.set-check');
-  btn.classList.toggle('checked', set.done);
 
-  // Update progress bar
   const ex = workoutState.exercises[ei];
   const doneSets = ex.sets.filter(s => s.done).length;
   const progFill = document.getElementById(`prog-${ei}`);
@@ -1020,19 +1004,10 @@ function toggleSetDone(ei, si) {
 
   updateWorkoutProgress();
   saveWorkoutDraft();
-
-  // Auto-scroll to next undone set
-  if (set.done) {
-    const nextUndoneSet = workoutState.exercises[ei].sets.findIndex((s, idx) => idx > si && !s.done);
-    if (nextUndoneSet !== -1) {
-      const nextRow = document.getElementById(`set-${ei}-${nextUndoneSet}`);
-      if (nextRow) nextRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
 }
 
 function confirmExitWorkout() {
-  const doneSets = workoutState.exercises.reduce((a, ex) => a + ex.sets.filter(s => s.done).length, 0);
+  const doneSets = workoutState.exercises.reduce((a, ex) => a + ex.sets.filter(isSetCommitted).length, 0);
   if (doneSets === 0) {
     exitWorkout();
     return;
@@ -1069,7 +1044,7 @@ function finishWorkout() {
     exercises: workoutState.exercises.map(ex => ({
       exId: ex.exId,
       name: ex.name,
-      sets: ex.sets.filter(s => s.done).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 }))
+      sets: ex.sets.filter(isSetCommitted).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 }))
     })).filter(ex => ex.sets.length > 0)
   };
 
